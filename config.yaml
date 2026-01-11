@@ -1,0 +1,96 @@
+edr:
+  name: edr-mock
+  mode: fireeye_like
+
+file_inspection:
+  enable: true
+
+  paths:
+    - D:/test/data
+    - D:/test/data2
+
+  recursive: true
+
+  min_size_kb: 4
+  max_size_mb: 10
+
+  inspect_extensions:
+    - ""
+    - .exe
+    - .dll
+    - .jar
+    - .xml
+    - .dat
+    - .txt
+    - .png
+
+  light_scan_hash_loops: 200
+  full_scan_hash_loops: 1000
+
+  burst_control:
+    threshold: 50
+    window_sec: 5
+    delay_ms: 200
+
+
+packet_inspection:
+  enable: true
+
+  mode: mock        # mock | pcap
+  interface: null
+
+  protocols:
+    - TCP
+    - UDP
+
+  ports:
+    include:
+      - 80
+      - 443
+      - 8080
+    exclude:
+      - 53
+
+  payload_inspection:
+    enable: true
+    min_payload_size: 128
+    hash_loops: 300
+
+  burst_control:
+    threshold: 200
+    window_sec: 3
+    delay_ms: 100
+
+
+logging:
+  base_dir: logs
+
+  default:
+    level: INFO
+    file: edr_mock.log
+    timestamp: true
+    rotation:
+      type: size  # size | daily | none
+      max_bytes: 10485760 # 10MB(sizeの時)
+      backup_count: 5  # 世代数
+      when: midnight  # dailyのとき
+      interval: 1
+
+      # rotation 設定サマリ
+      # backup_count: OK: size | daily / NG: none
+      # when: OK:daily / NG: size | none 
+      # interval: OK daily / NG: size | none
+
+
+  components:
+    file_watcher:
+      level: DEBUG
+    packet_watcher:
+      level: WARNING
+    debug:
+      level: DEBUG
+    metrics:
+      level: INFO
+    metrics_debug:
+      level: INFO
+
