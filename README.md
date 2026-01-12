@@ -51,6 +51,8 @@ edrsim は「EDR 本体」と「負荷生成用デバッガ」を完全に分離
 実際の EDR 導入検証と同様に、外部からのファイル・通信イベントが、どの内部処理にどれだけの負荷を与えるかを明確に観測できる設計になっています。
 
 
+[機能説明](doc/architecture.md) はこちらも参照してください。
+
 ## ディレクトリ構成
 
 ```
@@ -116,6 +118,8 @@ uv run -m edrsim_debug.main
 
 
 ## config.yaml について
+
+[config.yamlの設定値の説明](doc/config_yaml_reference.md) はこちらも参照してください。
 
 ### ログ設定（例）
 
