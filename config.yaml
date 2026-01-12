@@ -1,6 +1,6 @@
 edr:
   name: edr-mock
-  mode: fireeye_like
+  mode: behavior_based
 
 file_inspection:
   enable: true

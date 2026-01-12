@@ -11,6 +11,14 @@ EDR（Endpoint Detection and Response）製品の挙動を模擬し、
 * 「なぜ重くなるのか」を **ログとメトリクスで説明できる状態**を作る
 
 
+## このリポジトリ内容が向いている人
+
+* EDR 導入前の性能検証をしたい
+* 「EDR が重い理由」を説明できる材料が欲しい
+* SOC / NW / AP チーム間で共通の検証基盤が欲しい
+* 擬似的にでも **本番に近い負荷**を再現したい
+
+
 ## 特徴
 
 ### ファイル監視（File Inspection）
@@ -24,7 +32,7 @@ EDR（Endpoint Detection and Response）製品の挙動を模擬し、
 ### パケット監視（Packet Inspection）
 
 * **mock モード**：EDR 内部処理負荷の疑似生成
-* **pcap モード（将来対応）**：実パケット再生による検証
+* **pcap モード（現在未実装で将来対応）**：実パケット再生による検証
 * payload サイズに応じたハッシュ計算
 * バースト検知・スロットリング挙動を再現
 
@@ -34,30 +42,6 @@ EDR（Endpoint Detection and Response）製品の挙動を模擬し、
 * プロセス単位の CPU / メモリ使用量を定期ログ出力
 * file_watcher / packet_watcher / debug それぞれ独立して取得
 * multiprocessing 環境でも「どの処理の負荷か」を判別可能
-
-
-### ログ設計（重要）
-
-* **JSON ログ形式**
-* 全ログに以下を自動付与
-
-  * component 名
-  * config_hash（設定ハッシュ）
-  * timestamp（UTC）
-
-```json
-{
-  "ts": "2026-01-11T13:14:30Z",
-  "component": "file_watcher",
-  "config_hash": "abc123...",
-  "event": "inspect",
-  "path": "D:/test/data/sample.exe",
-  "inspect_ms": 123.4
-}
-```
-
-**「このログは、どの設定で、どの処理が、どれだけ重かったのか」**
-を後から完全に再現できます。
 
 
 ## ディレクトリ構成
@@ -102,7 +86,6 @@ packet_inspection:
   enable: true
   mode: mock
 ```
-
 
 ### ２．EDR 本体起動
 
@@ -163,12 +146,158 @@ burst_control:
 * 実 EDR 製品の「CPU スパイク抑制」を模擬
 
 
-## このプロジェクトが向いている人
 
-* EDR 導入前の性能検証をしたい
-* 「EDR が重い理由」を説明できる材料が欲しい
-* SOC / NW / AP チーム間で共通の検証基盤が欲しい
-* 擬似的にでも **本番に近い負荷**を再現したい
+### ログ設計
+
+* **JSON ログ形式**
+* 全ログに以下を自動付与
+
+  * component 名
+  * config_hash（設定ハッシュ）
+  * timestamp（UTC）
+
+```json
+{
+  "ts": "2026-01-11T13:14:30Z",
+  "component": "file_watcher",
+  "config_hash": "abc123...",
+  "event": "inspect",
+  "path": "D:/test/data/sample.exe",
+  "inspect_ms": 123.4
+}
+```
+
+**「このログは、どの設定で、どの処理が、どれだけ重かったのか」** を後から確認できます。
+
+## ログ構成（Log Architecture）
+
+edrsim では、**目的別・責務別にログファイルを分離**しています。
+これにより、
+
+* どの設定で起動したか
+* どの機能が動いたか
+* どの処理がどれだけ重かったか
+
+を **後から確認や説明でき情報を記録します。
+
+### ログファイル一覧と役割
+
+| ログファイル                        | 内容                                |
+| ----------------------------- | --------------------------------- |
+| `edr-mock_main.log`           | 起動時の設定スナップショット（config 証跡）         |
+| `edr-mock_file_watcher.log`   | ファイル検査の実行ログ                       |
+| `edr-mock_packet_watcher.log` | パケット検査の実行ログ（通信発生時のみ）              |
+| `edr-mock_metrics.main.log`   | EDR 本体プロセスの CPU / メモリ使用量          |
+| `edr-mock_metrics.packet.log` | packet_watcher プロセスの CPU / メモリ使用量 |
+| `edr-mock_debug.log`          | 検証用（負荷生成・mock 動作）ログ               |
+
+
+
+### 1. 起動ログ（設定の確定）
+
+`edr-mock_main.log`
+
+```json
+{
+  "component": "edrsim",
+  "event": "startup",
+  "edr": { "name": "edr-mock", "mode": "behavior_based" },
+  "file_inspection": {...},
+  "packet_inspection": {...}
+}
+```
+
+このログは **「この実行がどんな設定で行われたか」** を確定させるためのものです。
+後続のすべてのログは、この設定を前提として解釈できます。
+
+
+
+### 2. 機能別イベントログ
+
+#### ファイル検査
+
+`edr-mock_file_watcher.log`
+
+```json
+{
+  "component": "file_inspection",
+  "event": "inspect",
+  "path": "D:/test/data/sample.exe",
+  "hash_loops": 200,
+  "inspect_ms": 18.73
+}
+```
+
+* 1 ファイル単位の検査コストを可視化
+* ハッシュ回数と処理時間の関係を定量評価可能
+
+#### パケット検査
+
+`edr-mock_packet_watcher.log`
+
+```json
+{
+  "component": "packet_watcher",
+  "event": "packet_inspected",
+  "payload_size": 512,
+  "inspect_ms": 3.2
+}
+```
+
+※ 本ログは **実際に検査対象となる通信が発生した場合のみ出力**されます。
+※ config.yamlのpacket_inspection>modeがmockの場合はログ出力されません。
+
+
+
+### 3. メトリクスログ（性能影響の可視化）
+
+#### EDR 本体プロセス
+
+`edr-mock_metrics.main.log`
+
+```json
+{
+  "event": "process_metrics",
+  "cpu_percent": 98.4,
+  "memory_mb": 31.02,
+  "pid": 376
+}
+```
+
+#### packet_watcher プロセス
+
+`edr-mock_metrics.packet.log`
+
+```json
+{
+  "event": "process_metrics",
+  "cpu_percent": 1.6,
+  "memory_mb": 25.7,
+  "pid": 6104
+}
+```
+
+* multiprocessing 環境でも **どの機能が負荷を発生させているか** を切り分け可能
+* burst 制御や hash loop 設定変更の影響を定量的に評価できます
+
+
+
+### 4. debug ログ（検証用）
+
+`edr-mock_debug.log`
+
+```json
+{
+  "component": "edrsim_debug.file_generator",
+  "event": "file_created",
+  "path": "D:/test/data/sample.dat"
+}
+```
+
+* 本番相当ログとは分離
+* 検証用の疑似挙動を明示的に区別
+
+
 
 
 ## 注意事項
