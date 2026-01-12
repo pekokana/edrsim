@@ -45,6 +45,11 @@ EDR（Endpoint Detection and Response）製品の挙動を模擬し、
 * file_watcher / packet_watcher / debug それぞれ独立して取得
 * multiprocessing 環境でも「どの処理の負荷か」を判別可能
 
+### その他の特徴
+
+edrsim は「EDR 本体」と「負荷生成用デバッガ」を完全に分離した構成を取っています。
+実際の EDR 導入検証と同様に、外部からのファイル・通信イベントが、どの内部処理にどれだけの負荷を与えるかを明確に観測できる設計になっています。
+
 
 ## ディレクトリ構成
 

@@ -25,6 +25,50 @@ edrsim は以下 3 レイヤで構成される。
 
 ```
 
+### 各機能の関わり概要図
+
+```mermaid
+flowchart LR
+    subgraph Debugger["edrsim_debug（負荷生成・検証側）"]
+        DG_MAIN["main.py"]
+        FILE_GEN["FileGenerator"]
+        PKT_FACTORY["packet_factory"]
+        PKT_MOCK["packet_mock"]
+        BURST_D["BurstController"]
+        MET_D["MetricsLogger"]
+
+        DG_MAIN --> FILE_GEN
+        DG_MAIN --> PKT_FACTORY
+        PKT_FACTORY --> PKT_MOCK
+        DG_MAIN --> BURST_D
+        DG_MAIN --> MET_D
+    end
+
+    subgraph Target["監視対象（OS / ファイル / ネットワーク）"]
+        FS["File System"]
+        NET["Network (mock / pcap)"]
+    end
+
+    FILE_GEN --> FS
+    PKT_MOCK --> NET
+
+    subgraph EDR["edrsim（EDR 本体）"]
+        MAIN["main.py"]
+
+        FW["FileWatcher"]
+        PW["PacketWatcher"]
+
+        MET_M["MetricsLogger"]
+
+        MAIN --> FW
+        MAIN --> PW
+        MAIN --> MET_M
+    end
+
+    FS --> FW
+    NET --> PW
+```
+
 
 
 ## 2. core レイヤ
@@ -118,6 +162,24 @@ logs/
 - マルウェア解析はしない
 - あくまで **性能・挙動の理解用**
 
+
+### EDRsimとデバッカーの対応概要
+
+```mermaid
+flowchart TB
+    subgraph Debugger
+        D_FILE["FileGenerator"]
+        D_PACKET["packet_mock"]
+    end
+
+    subgraph EDR
+        E_FILE["FileWatcher"]
+        E_PACKET["PacketWatcher"]
+    end
+
+    D_FILE -->|"ファイル作成・更新"| E_FILE
+    D_PACKET -->|"疑似パケット"| E_PACKET
+```
 
 
 ## 8. 将来拡張ポイント
